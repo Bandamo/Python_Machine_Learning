@@ -2,17 +2,29 @@ import numpy as np
 import warnings
 import time
 import os
-import matplotlib.pyplot as plt
-import tqdm
+import utils
 
 
 def sigmoid(arr: np.ndarray):
-    return 1 / (1 + np.exp(-arr))
+    """
+    Simple function going from R to [-1;1]
+    :param arr: input in R
+    :return: output in [-1;1]
+    """
+    return 2 / (1 + np.exp(-arr))
 
 
 def randfloat(a: float, b: float, shape: tuple):
-    np.random.seed(time.time_ns()%(2**31-1))
+    np.random.seed(time.time_ns() % (2 ** 31 - 1))
     return (b - a) * np.random.random(shape) + a
+
+
+def bernoulli_proba(p=0.5):
+    result = np.random.random()
+    if result < p:
+        return True
+    else:
+        return False
 
 
 def clear():
@@ -41,11 +53,11 @@ class Layer:
         self.list_activity = sigmoid(np.dot(input_array, self.list_weight))
         return self.list_activity
 
-    def mutate(self):
+    def mutate(self, mutating_rate: float):
         # Multiply every weight by a factor generally between 0.75 and 1.25
         for x in range(len(self.list_weight)):
             for y in range(len(self.list_weight[0])):
-                self.list_weight[x][y] = self.list_weight[x][y] * np.random.normal(1, 0.25)
+                if bernoulli_proba(mutating_rate): self.list_weight[x][y] = randfloat(-10, 10, (1, 1))[0][0]
 
 
 class Brain:
@@ -78,9 +90,9 @@ class Brain:
             else:
                 self.layers = [Layer(nb_input=nb_input, nb_neurone=nb_output)]
 
-    def mutate(self):
+    def mutate(self, mutating_rate: float):
         for layer in self.layers:
-            layer.mutate()
+            layer.mutate(mutating_rate=mutating_rate)
 
     def think(self, input_array: np.ndarray, decision=False):
         """
@@ -101,8 +113,10 @@ class Brain:
 
 
 class Grid:
-    def __init__(self, shape=(20, 30)):
-        self.value = np.zeros(shape=shape)
+    def __init__(self, shape=(20, 20)):
+        real_shape = (shape[0] + 2, shape[1] + 2)
+        self.value = np.zeros(shape=real_shape)
+        self.apple_pos = []
 
     def verif_move(self, position, dir):
         """
@@ -160,6 +174,18 @@ class Grid:
         except IndexError:
             warnings.warn("IndexError : Veuillez ressaisir la position, rien n'a été changé")
 
+    def generate_apple(self, proportion):
+        """
+        Generate a batch of apple in the grid
+        :param proportion:
+        :return:
+        """
+        for x in range(len(self.value)):
+            for y in range(len(self.value[0])):
+                if bernoulli_proba(proportion):
+                    self.apple_pos += [[x, y]]
+                    self.add_elem((x, y), 2)
+
     def move_object(self, pos1, pos2):
         """
         Move an object from pos1 to pos2, overwriting pos2
@@ -180,7 +206,7 @@ class Grid:
 
 
 class Animal():
-    def __init__(self, brain=Brain(10, 5, 0, 5), energy=100, grid=Grid(), position="Default"):
+    def __init__(self, brain=Brain(10, 5, 0, 5), grid=Grid(), position="Default"):
         """
 
         :param energy: Energy of the animal
@@ -189,12 +215,16 @@ class Animal():
         :param grid: grid where the animal can move
         """
         self.species = 1  # 1 is the type of Animal
-        self.energy = energy
+        self.score = 0
         self.brain = brain
         self.grid = grid
         if position == "Default":
+            self.position = [self.grid.value.shape[0] // 2, self.grid.value.shape[1] // 2]
+        elif position == "Random":
             self.position = [np.random.randint(0, self.grid.value.shape[0]),
                              np.random.randint(0, self.grid.value.shape[1])]
+        else:
+            self.position = position
         self.grid.add_elem(self.position, self.species)
 
     def move(self, dir):
@@ -223,6 +253,30 @@ class Animal():
             self.grid.move_object(self.position, new_pos)
             self.position = new_pos
 
+    def get_input(self):
+        """
+        get input for the brain, take all case in a 3 case radius:
+         0  1  2  3  4  5  6
+         7  8  9 10 11 12 13
+        14 15 16 17 18 19 20
+        21 22 23 XX 24 25 26
+        27 28 29 30 31 32 33
+        34 35 36 37 38 39 40
+        41 42 43 44 45 46 47
+        :return:
+        """
+        input_arr = []
+        for k in range(-3, 4):
+            for i in range(-3, 4):
+                try:
+                    if (k, i) != (0, 0) and k >= 0 and i >= 0:
+                        input_arr += [self.grid.value[k][i]]
+                    elif k < 0 or i < 0:
+                        input_arr += [-1]
+                except IndexError:
+                    input_arr += [-1]
+        return input_arr
+
     def take_decision(self, input_arr):
         output = self.brain.think(input_arr, decision=True)
         self.move(output)
@@ -230,32 +284,8 @@ class Animal():
 
 
 if __name__ == '__main__':
-    for k in range(10):
-
-        os.mkdir("Images_"+str(k).zfill(3))
-
-        shape_grid=(20,20)
-
-        world = Grid(shape=shape_grid)
-        animal=Animal(grid=world)
-        bar=tqdm.tqdm(total=100)
-        for i in range(100):
-            bar.update()
-
-            input_arr=np.random.random((1,10))
-            animal.take_decision(input_arr)
-
-            fig, ax = plt.subplots(figsize=(12, 12))
-
-            tick=np.arange(0,20,1)
-            ax.set_xticks(tick)
-            ax.set_yticks(tick)
-            ax.grid(which='major', alpha=0.5)
-
-            ax.scatter(animal.position[0],animal.position[1])
-            plt.xlim([0,20])
-            plt.ylim([0,20])
-            plt.savefig("Images_"+str(k).zfill(3)+"/Im_"+str(i).zfill(3)+".png")
-            plt.close(fig)
-        bar.close()
+    # noinspection PyTypeChecker
+    anim = Animal(position=(0,0))
+    anim.grid.display()
+    print(anim.get_input())
 
