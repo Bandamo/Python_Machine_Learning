@@ -3,6 +3,7 @@ import warnings
 import time
 import os
 import matplotlib.pyplot as plt
+import tqdm
 
 
 def sigmoid(arr: np.ndarray):
@@ -229,19 +230,32 @@ class Animal():
 
 
 if __name__ == '__main__':
-    for _ in range(10):
-        world = Grid()
-        liste_animal=[]
-        for _ in range(20):
-            liste_animal+=[Animal(grid=world)]
-            time.sleep(0.0001)
-        world.display()
-        while True:
-            for tom in liste_animal:
-                input_arr=np.random.random((1,10))
-                #print("Input : "+str(input_arr))
-                a=tom.take_decision(input_arr)
-            world.display()
-            time.sleep(0.5)
-            os.system("clear")
+    for k in range(10):
+
+        os.mkdir("Images_"+str(k).zfill(3))
+
+        shape_grid=(20,20)
+
+        world = Grid(shape=shape_grid)
+        animal=Animal(grid=world)
+        bar=tqdm.tqdm(total=100)
+        for i in range(100):
+            bar.update()
+
+            input_arr=np.random.random((1,10))
+            animal.take_decision(input_arr)
+
+            fig, ax = plt.subplots(figsize=(12, 12))
+
+            tick=np.arange(0,20,1)
+            ax.set_xticks(tick)
+            ax.set_yticks(tick)
+            ax.grid(which='major', alpha=0.5)
+
+            ax.scatter(animal.position[0],animal.position[1])
+            plt.xlim([0,20])
+            plt.ylim([0,20])
+            plt.savefig("Images_"+str(k).zfill(3)+"/Im_"+str(i).zfill(3)+".png")
+            plt.close(fig)
+        bar.close()
 
