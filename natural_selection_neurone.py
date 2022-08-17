@@ -15,7 +15,6 @@ def sigmoid(arr: np.ndarray):
 
 
 def randfloat(a: float, b: float, shape: tuple):
-    np.random.seed(time.time_ns() % (2 ** 31 - 1))
     return (b - a) * np.random.random(shape) + a
 
 
@@ -48,9 +47,10 @@ class Layer:
                     raise AttributeError
             except AttributeError:
                 raise AttributeError
+        self.bias = randfloat(-10, 10, (1, nb_neurone))
 
     def process(self, input_array):
-        self.list_activity = sigmoid(np.dot(input_array, self.list_weight))
+        self.list_activity = sigmoid(np.dot(input_array, self.list_weight) + self.bias)
         return self.list_activity
 
     def mutate(self, mutating_rate: float):
@@ -58,6 +58,8 @@ class Layer:
         for x in range(len(self.list_weight)):
             for y in range(len(self.list_weight[0])):
                 if bernoulli_proba(mutating_rate): self.list_weight[x][y] = randfloat(-10, 10, (1, 1))[0][0]
+        for k in range(len(self.bias)):
+            if bernoulli_proba(mutating_rate): self.bias[k] = randfloat(-10, 10, (1, 1))
 
 
 class Brain:
@@ -206,7 +208,7 @@ class Grid:
 
 
 class Animal():
-    def __init__(self, brain=Brain(10, 5, 0, 5), grid=Grid(), position="Default"):
+    def __init__(self, brain_parameter=(0, 0, 0, 0), brain=Brain(48, 5, 1, 50), grid=Grid(), position="Default"):
         """
 
         :param energy: Energy of the animal
@@ -216,7 +218,10 @@ class Animal():
         """
         self.species = 1  # 1 is the type of Animal
         self.score = 0
-        self.brain = brain
+        if brain_parameter != (0, 0, 0, 0):
+            self.brain = Brain(brain_parameter[0], brain_parameter[1], brain_parameter[2], brain_parameter[3])
+        else:
+            self.brain = brain
         self.grid = grid
         if position == "Default":
             self.position = [self.grid.value.shape[0] // 2, self.grid.value.shape[1] // 2]
@@ -236,22 +241,27 @@ class Animal():
         :param dir: Direction of the movement
 
         """
-        if dir == 1 and self.grid.verif_move(self.position, dir) == 0:
-            new_pos = [self.position[0], self.position[1] + 1]
-            self.grid.move_object(self.position, new_pos)
-            self.position = new_pos
-        elif dir == 2 and self.grid.verif_move(self.position, dir) == 0:
-            new_pos = [self.position[0] - 1, self.position[1]]
-            self.grid.move_object(self.position, new_pos)
-            self.position = new_pos
-        elif dir == 3 and self.grid.verif_move(self.position, dir) == 0:
-            new_pos = [self.position[0] + 1, self.position[1]]
-            self.grid.move_object(self.position, new_pos)
-            self.position = new_pos
-        elif dir == 4 and self.grid.verif_move(self.position, dir) == 0:
-            new_pos = [self.position[0], self.position[1] - 1]
-            self.grid.move_object(self.position, new_pos)
-            self.position = new_pos
+        new_pos_case = self.grid.verif_move(self.position, dir)
+        if new_pos_case != -1 and new_pos_case != 1:
+            if dir == 1:
+                new_pos = [self.position[0], self.position[1] + 1]
+                self.grid.move_object(self.position, new_pos)
+                self.position = new_pos
+            elif dir == 2:
+                new_pos = [self.position[0] - 1, self.position[1]]
+                self.grid.move_object(self.position, new_pos)
+                self.position = new_pos
+            elif dir == 3:
+                new_pos = [self.position[0] + 1, self.position[1]]
+                self.grid.move_object(self.position, new_pos)
+                self.position = new_pos
+            elif dir == 4:
+                new_pos = [self.position[0], self.position[1] - 1]
+                self.grid.move_object(self.position, new_pos)
+                self.position = new_pos
+
+        if new_pos_case == 2:  # If eat apple
+            self.eat_apple()
 
     def get_input(self):
         """
@@ -266,10 +276,10 @@ class Animal():
         :return:
         """
         input_arr = []
-        for k in range(-3, 4):
-            for i in range(-3, 4):
+        for k in range(self.position[0] - 3, self.position[0] + 4):
+            for i in range(self.position[1] - 3, self.position[1] + 4):
                 try:
-                    if (k, i) != (0, 0) and k >= 0 and i >= 0:
+                    if (k, i) != (self.position[0], self.position[1]) and k >= 0 and i >= 0:
                         input_arr += [self.grid.value[k][i]]
                     elif k < 0 or i < 0:
                         input_arr += [-1]
@@ -282,10 +292,21 @@ class Animal():
         self.move(output)
         return output
 
+    def eat_apple(self):
+        if self.position in self.grid.apple_pos:  # Verif si il y a bien une pomme à cet endroit
+            self.score += 1
+            self.grid.apple_pos.remove(self.position)
+
 
 if __name__ == '__main__':
-    # noinspection PyTypeChecker
-    anim = Animal(position=(0,0))
-    anim.grid.display()
-    print(anim.get_input())
-
+    world = Grid()
+    world.generate_apple(0.25)
+    anim = Animal(grid=world)
+    while True:
+        input_arr = [anim.get_input()]
+        print(input_arr)
+        anim.take_decision(input_arr=input_arr)
+        world.display()
+        print(anim.score)
+        time.sleep(0.3)
+        os.system('clear')
