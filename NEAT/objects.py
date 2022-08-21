@@ -6,6 +6,8 @@ import copy
 def randpm1():
     return 2 * (np.random.random() - 0.5)
 
+def bernoulli_bool(p):
+    return np.random.random()<=p
 
 class Node:
     def __init__(self, id_node: int, variety: int):
@@ -28,7 +30,7 @@ class Node:
         self.activated=False
 
     def activate(self):
-        self.value=np.tanh(self.value)
+        self.value=np.tanh(self.inputs+self.bias)
 
 
 class Connection:
@@ -84,7 +86,7 @@ class Brain:
         while len(connection_left)>0:
             for conn in connection_left:
                 if self.find_node(conn.inputs).activated:
-                    self.find_node(conn.outputs).value+=self.find_node(conn.inputs).value * conn.weight
+                    self.find_node(conn.outputs).inputs+=self.find_node(conn.inputs).value * conn.weight
                     connection_left.remove(conn)
             for n in node_list:
                 if not(n.id_node in [connection_left[k].outputs for k in range(len(connection_left))]):
@@ -94,11 +96,6 @@ class Brain:
         node_list=self.inputs+self.hl_node+self.outputs
         for n in node_list:
             n.reset()
-
-
-
-
-
 
 
 if __name__ == '__main__':
