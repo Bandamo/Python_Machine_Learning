@@ -21,14 +21,25 @@ def crossover(b1: objects.Brain, b2: objects.Brain):
     c_children = []
 
     curseur = 0
-    while curseur < len(c1):
+    while len(c1) != 0:
         index = find_c(c1[curseur], c2)
         if index != None:
-            if objects.bernoulli_bool(0.5):
+            if not c1[curseur].enabling:
+                c_children += [c1[curseur]]
+            if not c2[index].enabling:
+                c_children += [c2[index]]
+            elif objects.bernoulli_bool(0.5):
                 c_children += [c1[curseur]]
             else:
                 c_children += [c2[index]]
             c1.pop(curseur)
             c2.pop(index)
         else:
-            curseur += 1
+            c_children += [c1[curseur]]
+
+    for c in c2:
+        c_children += [c]
+
+    b_children.connections = c_children
+
+    return b_children
